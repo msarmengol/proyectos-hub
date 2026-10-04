@@ -1,0 +1,23 @@
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# SQLite Database & journals
+projects.db
+projects.db-wal
+projects.db-shm
+
+# Environment & local secrets
+.env
+.env.local
+
+# OS / Editor specific
+.DS_Store
+.vscode/
+.idea/

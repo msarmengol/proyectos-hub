@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProjectHub - Fichas de Proyectos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Top Navigation -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-xl font-bold">
+          ⚡
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            ProjectHub
+            <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">Local SQLite</span>
+          </h1>
+          <p class="text-xs text-slate-400">Catálogo y fichas de proyectos e ideas</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <button onclick="openScanModal()" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+          <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+          <span class="hidden sm:inline">Escanear</span> Carpetas
+        </button>
+        <button onclick="exportBackup()" title="Descargar copia de seguridad en JSON" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition border border-slate-800">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        </button>
+        <button onclick="document.getElementById('importFileInput').click()" title="Restaurar copia de seguridad JSON" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition border border-slate-800">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        </button>
+        <input type="file" id="importFileInput" class="hidden" accept=".json" onchange="importBackup(event)">
+        <button onclick="openCreateModal()" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Nueva Ficha
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- KPI / Stats Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" id="statsContainer">
+      <!-- Injected by JS -->
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
+      <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <!-- Search Input -->
+        <div class="relative flex-1">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <input 
+            type="text" 
+            id="searchInput" 
+            oninput="handleSearch(this.value)"
+            placeholder="Buscar por nombre, tecnologías, palabras clave del alcance..." 
+            class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+          >
+          <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white">
+            ✕
+          </button>
+        </div>
+
+        <!-- Filter dropdowns -->
+        <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+          <select id="categoryFilter" onchange="applyFilters()" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="todas">Todas las categorías</option>
+            <option value="Web">Web</option>
+            <option value="Backend">Backend</option>
+            <option value="IA / Agentes">IA / Agentes</option>
+            <option value="Script / CLI">Script / CLI</option>
+            <option value="Automatización">Automatización</option>
+            <option value="Mobile">Mobile</option>
+            <option value="Otro">Otro</option>
+          </select>
+
+          <select id="sortBy" onchange="applyFilters()" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="updated_at">Última actualización</option>
+            <option value="priority">Prioridad (Alta primero)</option>
+            <option value="title">Nombre (A-Z)</option>
+            <option value="created_at">Más recientes</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick Status Badges Filter -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-slate-800/80 pt-3" id="statusFilterPills">
+        <button onclick="setStatusFilter('todos')" data-status="todos" class="status-pill px-3 py-1 rounded-lg font-medium transition bg-indigo-600 text-white shadow-sm">
+          Todos (<span id="count-todos">0</span>)
+        </button>
+        <button onclick="setStatusFilter('idea')" data-status="idea" class="status-pill px-3 py-1 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+          💡 Ideas (<span id="count-idea">0</span>)
+        </button>
+        <button onclick="setStatusFilter('desarrollo')" data-status="desarrollo" class="status-pill px-3 py-1 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+          🚧 En desarrollo (<span id="count-desarrollo">0</span>)
+        </button>
+        <button onclick="setStatusFilter('produccion')" data-status="produccion" class="status-pill px-3 py-1 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+          🚀 Producción (<span id="count-produccion">0</span>)
+        </button>
+        <button onclick="setStatusFilter('pausado')" data-status="pausado" class="status-pill px-3 py-1 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+          ⏸️ Pausados (<span id="count-pausado">0</span>)
+        </button>
+        <button onclick="setStatusFilter('archivado')" data-status="archivado" class="status-pill px-3 py-1 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+          📦 Archivados (<span id="count-archivado">0</span>)
+        </button>
+      </div>
+    </div>
+
+    <!-- Projects Grid -->
+    <div id="projectsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <!-- Cards rendered by JS -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-16 px-4 bg-slate-900/40 rounded-2xl border border-dashed border-slate-800">
+      <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-400 mx-auto flex items-center justify-center text-3xl mb-4">
+        📁
+      </div>
+      <h3 class="text-base font-semibold text-white mb-1">No hay proyectos que coincidan</h3>
+      <p class="text-sm text-slate-400 max-w-md mx-auto mb-6">Prueba a cambiar el filtro, buscar con otras palabras, o añade tu primer proyecto o idea.</p>
+      <div class="flex justify-center gap-3">
+        <button onclick="openCreateModal()" class="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition">
+          + Crear Ficha
+        </button>
+        <button onclick="openScanModal()" class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+          🔍 Escanear Carpetas
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: Ver Ficha Detallada -->
+  <div id="detailModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in">
+      
+      <!-- Modal Header -->
+      <div class="p-5 sm:p-6 border-b border-slate-800 flex items-start justify-between bg-slate-900/50 sticky top-0 z-10">
+        <div class="space-y-2 pr-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span id="detailStatusBadge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full border"></span>
+            <span id="detailPriorityBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full border"></span>
+            <span id="detailCategoryBadge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700"></span>
+          </div>
+          <h2 id="detailTitle" class="text-xl sm:text-2xl font-bold text-white tracking-tight"></h2>
+          <p id="detailSummary" class="text-sm text-slate-300 leading-relaxed"></p>
+        </div>
+        <button onclick="closeDetailModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-sm">
+        
+        <!-- Tags bar -->
+        <div id="detailTagsSection" class="flex flex-wrap gap-1.5">
+          <!-- Tags injected here -->
+        </div>
+
+        <!-- Sección: Alcance Funcional -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-3">
+          <div class="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Alcance Funcional y Objetivos
+          </div>
+          <div id="detailFunctionalScope" class="text-slate-300 whitespace-pre-line leading-relaxed"></div>
+        </div>
+
+        <!-- Sección: Detalles Técnicos -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-4">
+          <div class="flex items-center gap-2 text-emerald-400 font-semibold text-xs tracking-wider uppercase">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+            Detalles Técnicos & Entorno
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <span class="text-xs text-slate-400 block mb-1">Stack Tecnológico</span>
+              <p id="detailStack" class="font-medium text-slate-200"></p>
+            </div>
+            <div>
+              <span class="text-xs text-slate-400 block mb-1">Repositorio Remoto</span>
+              <div id="detailRepoContainer" class="flex items-center gap-2 text-slate-300 font-mono text-xs">
+                <!-- Injected -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Local Path -->
+          <div id="detailPathRow" class="border-t border-slate-800/60 pt-3">
+            <span class="text-xs text-slate-400 block mb-1">Ruta en Disco</span>
+            <div class="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-300">
+              <span id="detailPath" class="truncate pr-2"></span>
+              <button onclick="copyToClipboard(document.getElementById('detailPath').innerText, this)" class="text-indigo-400 hover:text-indigo-300 font-sans text-xs flex-shrink-0">
+                Copiar
+              </button>
+            </div>
+          </div>
+
+          <!-- Run Command -->
+          <div id="detailRunRow" class="border-t border-slate-800/60 pt-3">
+            <span class="text-xs text-slate-400 block mb-1">Comando de Ejecución</span>
+            <div class="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono text-emerald-400">
+              <code id="detailRunCommand" class="truncate pr-2"></code>
+              <button onclick="copyToClipboard(document.getElementById('detailRunCommand').innerText, this)" class="text-emerald-400 hover:text-emerald-300 font-sans text-xs flex-shrink-0">
+                Copiar
+              </button>
+            </div>
+          </div>
+
+          <!-- Technical Notes -->
+          <div id="detailTechNotesRow" class="border-t border-slate-800/60 pt-3">
+            <span class="text-xs text-slate-400 block mb-1">Notas Técnicas & Arquitectura</span>
+            <p id="detailTechnicalNotes" class="text-xs text-slate-300 whitespace-pre-line leading-relaxed bg-slate-900/80 p-3 rounded-lg border border-slate-800/60"></p>
+          </div>
+        </div>
+
+        <!-- Sección: Próximos Pasos / Tareas -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-amber-400 font-semibold text-xs tracking-wider uppercase">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              Próximos Pasos & Tareas Pendientes
+            </div>
+            <span id="detailStepsCounter" class="text-xs text-slate-400 font-medium"></span>
+          </div>
+
+          <div id="detailStepsList" class="space-y-2">
+            <!-- Steps injected with checkboxes -->
+          </div>
+
+          <!-- Add quick step -->
+          <div class="flex gap-2 pt-2">
+            <input type="text" id="newStepInput" placeholder="Añadir siguiente paso..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            <button onclick="addQuickStep()" class="px-3 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition">
+              + Añadir
+            </button>
+          </div>
+        </div>
+
+        <!-- Notes libres -->
+        <div id="detailNotesContainer" class="text-xs text-slate-400">
+          <span class="font-semibold text-slate-300 block mb-1">Notas Libres:</span>
+          <p id="detailNotes" class="whitespace-pre-line"></p>
+        </div>
+
+        <!-- Meta info -->
+        <div class="text-[11px] text-slate-500 flex justify-between border-t border-slate-800 pt-3">
+          <span id="detailCreatedAt"></span>
+          <span id="detailUpdatedAt"></span>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-800 bg-slate-900 flex justify-between items-center">
+        <div class="flex gap-2">
+          <button onclick="deleteCurrentProject()" class="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg hover:bg-rose-500/10 transition">
+            Eliminar
+          </button>
+          <button onclick="duplicateCurrentProject()" class="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
+            Duplicar
+          </button>
+          <button onclick="exportSingleMarkdown()" class="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition">
+            Exportar Markdown
+          </button>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="closeDetailModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+            Cerrar
+          </button>
+          <button onclick="openEditModalFromDetail()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Editar Ficha
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal: Crear / Editar Ficha -->
+  <div id="formModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60 sticky top-0 z-10">
+        <h2 id="formModalTitle" class="text-lg font-bold text-white">Nueva Ficha de Proyecto</h2>
+        <button onclick="closeFormModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <form id="projectForm" onsubmit="saveProject(event)" class="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs sm:text-sm flex-1">
+        <input type="hidden" id="formProjectId">
+
+        <!-- Title -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Nombre del Proyecto *</label>
+          <input type="text" id="formTitle" required placeholder="Ej: Asistente de Voz con IA" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Summary -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Resumen / Idea en una frase</label>
+          <input type="text" id="formSummary" placeholder="Ej: Un backend modular para conversar por voz con múltiples personalidades..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Status, Category, Priority -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Estado</label>
+            <select id="formStatus" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500">
+              <option value="idea">💡 Idea / Boceto</option>
+              <option value="desarrollo">🚧 En desarrollo</option>
+              <option value="produccion">🚀 En producción</option>
+              <option value="pausado">⏸️ Pausado</option>
+              <option value="archivado">📦 Archivado</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Categoría</label>
+            <select id="formCategory" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500">
+              <option value="Web">Web</option>
+              <option value="Backend">Backend</option>
+              <option value="IA / Agentes">IA / Agentes</option>
+              <option value="Script / CLI">Script / CLI</option>
+              <option value="Automatización">Automatización</option>
+              <option value="Mobile">Mobile</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Prioridad</label>
+            <select id="formPriority" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500">
+              <option value="alta">🔴 Alta</option>
+              <option value="media" selected>🟡 Media</option>
+              <option value="baja">🟢 Baja</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Etiquetas (separadas por comas)</label>
+          <input type="text" id="formTags" placeholder="python, fastapi, sqlite, docker, ai" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Functional Scope -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Alcance Funcional</label>
+          <p class="text-[11px] text-slate-400 mb-1">¿Qué problema resuelve? ¿Qué funcionalidades clave tiene o debe tener el MVP?</p>
+          <textarea id="formFunctionalScope" rows="4" placeholder="- Permite registrar usuarios y personalizar respuestas.&#10;- Conexión con OpenAI y síntesis de voz.&#10;- Interfaz web para configuración." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <!-- Technical Section Header -->
+        <div class="border-t border-slate-800 pt-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2">Detalles Técnicos (Opcional si es solo una idea)</h3>
+        </div>
+
+        <!-- Stack & Run Command -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Stack Tecnológico</label>
+            <input type="text" id="formTechnicalStack" placeholder="Ej: Python 3.11, FastAPI, SQLite" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Comando de Arranque</label>
+            <input type="text" id="formRunCommand" placeholder="Ej: uvicorn main:app --reload" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs">
+          </div>
+        </div>
+
+        <!-- Local Path & Repo -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Ruta Local en Disco</label>
+            <input type="text" id="formLocalPath" placeholder="/home/ubuntu/mi-proyecto" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs">
+          </div>
+
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Repositorio Git / URL</label>
+            <input type="text" id="formRepoUrl" placeholder="https://github.com/usuario/repo" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs">
+          </div>
+        </div>
+
+        <!-- Technical Notes -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Notas Técnicas y Arquitectura</label>
+          <textarea id="formTechnicalNotes" rows="2" placeholder="Puertos usados, variables de entorno requeridas (.env), notas de base de datos..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <!-- Next Steps -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Próximos Pasos (una tarea por línea)</label>
+          <textarea id="formNextSteps" rows="3" placeholder="Diseñar esquema de base de datos&#10;Implementar endpoint de autenticación&#10;Escribir tests unitarios" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <!-- Free Notes -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Notas Libres</label>
+          <textarea id="formNotes" rows="2" placeholder="Cualquier idea suelta, inspiración o enlaces de referencia..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="border-t border-slate-800 pt-4 flex justify-end gap-2">
+          <button type="button" onclick="closeFormModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition">
+            Guardar Ficha
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Escanear Carpetas del Sistema -->
+  <div id="scanModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60 sticky top-0 z-10">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            🔍 Escanear Proyectos en Disco
+          </h2>
+          <p class="text-xs text-slate-400">Detecta proyectos existentes en carpetas para crear sus fichas con 1 clic</p>
+        </div>
+        <button onclick="closeScanModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4 flex-1">
+        <div class="flex gap-2">
+          <input type="text" id="scanPathInput" value="/home/ubuntu" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm font-mono text-slate-200">
+          <button onclick="triggerScan()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Escanear
+          </button>
+        </div>
+
+        <div id="scanLoading" class="hidden text-center py-8 text-slate-400 text-xs">
+          Escaneando directorios y analizando archivos...
+        </div>
+
+        <div id="scanResultsList" class="space-y-3">
+          <!-- Injected candidates -->
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-800 bg-slate-900 flex justify-between items-center">
+        <span id="scanSelectedCount" class="text-xs text-slate-400">0 seleccionados</span>
+        <div class="flex gap-2">
+          <button onclick="closeScanModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+            Cerrar
+          </button>
+          <button id="importBtn" onclick="importSelectedScanned()" disabled class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-500 text-white transition">
+            Importar Seleccionados
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-16 opacity-0 transition duration-300 pointer-events-none px-4 py-2.5 rounded-xl shadow-xl border text-xs sm:text-sm font-medium flex items-center gap-2">
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    let currentProjects = [];
+    let currentStats = {};
+    let currentFilterStatus = 'todos';
+    let currentDetailProject = null;
+    let scannedCandidates = [];
+
+    const STATUS_MAP = {
+      idea: { label: '💡 Idea', color: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+      desarrollo: { label: '🚧 En desarrollo', color: 'bg-sky-500/10 text-sky-400 border-sky-500/30' },
+      produccion: { label: '🚀 Producción', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+      pausado: { label: '⏸️ Pausado', color: 'bg-orange-500/10 text-orange-400 border-orange-500/30' },
+      archivado: { label: '📦 Archivado', color: 'bg-slate-500/10 text-slate-400 border-slate-500/30' }
+    };
+
+    const PRIORITY_MAP = {
+      alta: { label: 'Alta', color: 'text-rose-400 border-rose-500/30 bg-rose-500/10' },
+      media: { label: 'Media', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' },
+      baja: { label: 'Baja', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' }
+    };
+
+    // Initialization
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStats();
+      loadProjects();
+    });
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        currentStats = await res.json();
+        renderStats();
+      } catch (e) {
+        console.error('Error loading stats:', e);
+      }
+    }
+
+    function renderStats() {
+      const container = document.getElementById('statsContainer');
+      const items = [
+        { label: 'Total', count: currentStats.total || 0, status: 'todos', color: 'border-indigo-500/30 text-indigo-400' },
+        { label: '💡 Ideas', count: currentStats.idea || 0, status: 'idea', color: 'border-amber-500/30 text-amber-400' },
+        { label: '🚧 En desarrollo', count: currentStats.desarrollo || 0, status: 'desarrollo', color: 'border-sky-500/30 text-sky-400' },
+        { label: '🚀 Producción', count: currentStats.produccion || 0, status: 'produccion', color: 'border-emerald-500/30 text-emerald-400' },
+        { label: '⏸️ Pausados', count: currentStats.pausado || 0, status: 'pausado', color: 'border-orange-500/30 text-orange-400' },
+        { label: '📦 Archivados', count: currentStats.archivado || 0, status: 'archivado', color: 'border-slate-700 text-slate-400' }
+      ];
+
+      container.innerHTML = items.map(it => `
+        <div onclick="setStatusFilter('${it.status}')" class="cursor-pointer bg-slate-900/70 hover:bg-slate-800/80 border ${it.color} rounded-2xl p-3.5 transition group">
+          <div class="text-xs text-slate-400 truncate mb-1 group-hover:text-slate-200 transition">${it.label}</div>
+          <div class="text-2xl font-bold text-white tracking-tight">${it.count}</div>
+        </div>
+      `).join('');
+
+      // Update pills counters
+      document.getElementById('count-todos').innerText = currentStats.total || 0;
+      document.getElementById('count-idea').innerText = currentStats.idea || 0;
+      document.getElementById('count-desarrollo').innerText = currentStats.desarrollo || 0;
+      document.getElementById('count-produccion').innerText = currentStats.produccion || 0;
+      document.getElementById('count-pausado').innerText = currentStats.pausado || 0;
+      document.getElementById('count-archivado').innerText = currentStats.archivado || 0;
+    }
+
+    async function loadProjects() {
+      const search = document.getElementById('searchInput').value;
+      const category = document.getElementById('categoryFilter').value;
+      const sortBy = document.getElementById('sortBy').value;
+
+      let url = `/api/projects?sort_by=${sortBy}`;
+      if (currentFilterStatus && currentFilterStatus !== 'todos') {
+        url += `&status=${currentFilterStatus}`;
+      }
+      if (category && category !== 'todas') {
+        url += `&category=${encodeURIComponent(category)}`;
+      }
+      if (search.trim()) {
+        url += `&search=${encodeURIComponent(search.trim())}`;
+      }
+
+      try {
+        const res = await fetch(url);
+        currentProjects = await res.json();
+        renderProjects();
+      } catch (e) {
+        console.error('Error loading projects:', e);
+      }
+    }
+
+    function renderProjects() {
+      const container = document.getElementById('projectsContainer');
+      const emptyState = document.getElementById('emptyState');
+
+      if (!currentProjects || currentProjects.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      container.innerHTML = currentProjects.map(p => {
+        const statusConfig = STATUS_MAP[p.status] || STATUS_MAP.idea;
+        const priorityConfig = PRIORITY_MAP[p.priority] || PRIORITY_MAP.media;
+        
+        // Next steps progress
+        const steps = p.next_steps || [];
+        const totalSteps = steps.length;
+        const doneSteps = steps.filter(s => s.done).length;
+        
+        // Tags
+        const tags = (p.tags || []).slice(0, 4);
+
+        return `
+          <div class="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 flex flex-col justify-between transition duration-200 shadow-md hover:shadow-indigo-500/5 group">
+            <div class="space-y-3">
+              <!-- Top Badges -->
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${statusConfig.color}">
+                  ${statusConfig.label}
+                </span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[11px] font-medium px-2 py-0.5 rounded-full border ${priorityConfig.color}">
+                    ${priorityConfig.label}
+                  </span>
+                  <span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/80">
+                    ${p.category || 'Otro'}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Title & Summary -->
+              <div>
+                <h3 onclick="openDetailModal(${p.id})" class="text-base font-bold text-white hover:text-indigo-400 cursor-pointer transition tracking-tight line-clamp-1">
+                  ${escapeHtml(p.title)}
+                </h3>
+                <p class="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                  ${escapeHtml(p.summary || 'Sin descripción resumida...')}
+                </p>
+              </div>
+
+              <!-- Tech Stack Pills -->
+              ${p.technical_stack ? `
+                <div class="text-xs text-emerald-400/90 font-mono bg-emerald-500/5 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg truncate">
+                  ⚡ ${escapeHtml(p.technical_stack)}
+                </div>
+              ` : ''}
+
+              <!-- Tags -->
+              ${tags.length > 0 ? `
+                <div class="flex flex-wrap gap-1">
+                  ${tags.map(t => `<span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md font-mono">#${escapeHtml(t)}</span>`).join('')}
+                  ${p.tags.length > 4 ? `<span class="text-[10px] text-slate-500">+${p.tags.length - 4}</span>` : ''}
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Footer of card -->
+            <div class="border-t border-slate-800/80 pt-3 mt-4 flex items-center justify-between text-xs text-slate-400">
+              <!-- Steps indicator or indicators -->
+              <div class="flex items-center gap-2">
+                ${totalSteps > 0 ? `
+                  <span class="text-[11px] ${doneSteps === totalSteps ? 'text-emerald-400' : 'text-slate-400'} flex items-center gap-1 font-medium">
+                    ✓ ${doneSteps}/${totalSteps}
+                  </span>
+                ` : `
+                  <span class="text-[11px] text-slate-500 font-mono">
+                    ${p.local_path ? '📁 Local' : '💡 Idea'}
+                  </span>
+                `}
+              </div>
+
+              <!-- Quick actions -->
+              <div class="flex items-center gap-1">
+                <button onclick="openDetailModal(${p.id})" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition">
+                  Ver Ficha
+                </button>
+                <button onclick="editProjectById(${p.id})" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Editar">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setStatusFilter(status) {
+      currentFilterStatus = status;
+      document.querySelectorAll('.status-pill').forEach(btn => {
+        if (btn.dataset.status === status) {
+          btn.classList.add('bg-indigo-600', 'text-white');
+          btn.classList.remove('bg-slate-800', 'text-slate-300');
+        } else {
+          btn.classList.remove('bg-indigo-600', 'text-white');
+          btn.classList.add('bg-slate-800', 'text-slate-300');
+        }
+      });
+      loadProjects();
+    }
+
+    function applyFilters() {
+      loadProjects();
+    }
+
+    let searchTimeout = null;
+    function handleSearch(val) {
+      clearTimeout(searchTimeout);
+      const clearBtn = document.getElementById('clearSearchBtn');
+      if (val) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
+      searchTimeout = setTimeout(() => {
+        loadProjects();
+      }, 250);
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('clearSearchBtn').classList.add('hidden');
+      loadProjects();
+    }
+
+    // Modal: Detalle Ficha
+    async function openDetailModal(id) {
+      try {
+        const res = await fetch(`/api/projects/${id}`);
+        if (!res.ok) throw new Error('No encontrado');
+        currentDetailProject = await res.json();
+        renderDetailModal();
+        document.getElementById('detailModal').classList.remove('hidden');
+      } catch (e) {
+        showToast('Error abriendo el proyecto', 'error');
+      }
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+      currentDetailProject = null;
+    }
+
+    function renderDetailModal() {
+      const p = currentDetailProject;
+      if (!p) return;
+
+      const statusConfig = STATUS_MAP[p.status] || STATUS_MAP.idea;
+      const priorityConfig = PRIORITY_MAP[p.priority] || PRIORITY_MAP.media;
+
+      document.getElementById('detailTitle').innerText = p.title;
+      document.getElementById('detailSummary').innerText = p.summary || 'Sin resumen.';
+
+      // Badges
+      const sb = document.getElementById('detailStatusBadge');
+      sb.className = `text-xs font-semibold px-2.5 py-0.5 rounded-full border ${statusConfig.color}`;
+      sb.innerText = statusConfig.label;
+
+      const pb = document.getElementById('detailPriorityBadge');
+      pb.className = `text-xs font-semibold px-2 py-0.5 rounded-full border ${priorityConfig.color}`;
+      pb.innerText = `Prioridad: ${priorityConfig.label}`;
+
+      document.getElementById('detailCategoryBadge').innerText = p.category || 'Otro';
+
+      // Tags
+      const tagsContainer = document.getElementById('detailTagsSection');
+      if (p.tags && p.tags.length > 0) {
+        tagsContainer.classList.remove('hidden');
+        tagsContainer.innerHTML = p.tags.map(t => `<span class="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-0.5 rounded-md font-mono">#${escapeHtml(t)}</span>`).join('');
+      } else {
+        tagsContainer.classList.add('hidden');
+      }
+
+      // Functional Scope
+      document.getElementById('detailFunctionalScope').innerText = p.functional_scope || 'No se ha definido alcance funcional todavía. Haz click en Editar Ficha para añadirlo.';
+
+      // Technical Stack
+      document.getElementById('detailStack').innerText = p.technical_stack || 'Por definir';
+
+      // Repo
+      const repoContainer = document.getElementById('detailRepoContainer');
+      if (p.repo_url) {
+        repoContainer.innerHTML = `
+          <a href="${escapeHtml(p.repo_url)}" target="_blank" class="text-indigo-400 hover:underline truncate">${escapeHtml(p.repo_url)}</a>
+          <button onclick="copyToClipboard('${escapeHtml(p.repo_url)}', this)" class="text-slate-400 hover:text-white">Copiar</button>
+        `;
+      } else {
+        repoContainer.innerHTML = `<span class="text-slate-500">Sin repositorio configurado</span>`;
+      }
+
+      // Local Path
+      const pathRow = document.getElementById('detailPathRow');
+      if (p.local_path) {
+        pathRow.classList.remove('hidden');
+        document.getElementById('detailPath').innerText = p.local_path;
+      } else {
+        pathRow.classList.add('hidden');
+      }
+
+      // Run Command
+      const runRow = document.getElementById('detailRunRow');
+      if (p.run_command) {
+        runRow.classList.remove('hidden');
+        document.getElementById('detailRunCommand').innerText = p.run_command;
+      } else {
+        runRow.classList.add('hidden');
+      }
+
+      // Technical Notes
+      const techNotesRow = document.getElementById('detailTechNotesRow');
+      if (p.technical_notes) {
+        techNotesRow.classList.remove('hidden');
+        document.getElementById('detailTechnicalNotes').innerText = p.technical_notes;
+      } else {
+        techNotesRow.classList.add('hidden');
+      }
+
+      // Next steps / Checklist
+      renderDetailSteps();
+
+      // Free Notes
+      const notesContainer = document.getElementById('detailNotesContainer');
+      if (p.notes) {
+        notesContainer.classList.remove('hidden');
+        document.getElementById('detailNotes').innerText = p.notes;
+      } else {
+        notesContainer.classList.add('hidden');
+      }
+
+      // Timestamps
+      document.getElementById('detailCreatedAt').innerText = `Creado: ${new Date(p.created_at).toLocaleString()}`;
+      document.getElementById('detailUpdatedAt').innerText = `Actualizado: ${new Date(p.updated_at).toLocaleString()}`;
+    }
+
+    function renderDetailSteps() {
+      const p = currentDetailProject;
+      const steps = p.next_steps || [];
+      const list = document.getElementById('detailStepsList');
+      const counter = document.getElementById('detailStepsCounter');
+
+      const doneCount = steps.filter(s => s.done).length;
+      counter.innerText = `${doneCount} de ${steps.length} completadas`;
+
+      if (steps.length === 0) {
+        list.innerHTML = `<p class="text-xs text-slate-500 italic">No hay pasos definidos aún. Añade uno abajo.</p>`;
+        return;
+      }
+
+      list.innerHTML = steps.map((s, idx) => `
+        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80 hover:border-slate-700 transition">
+          <label class="flex items-center gap-2.5 cursor-pointer flex-1">
+            <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleStepCheck(${idx}, this.checked)" class="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500">
+            <span class="text-xs ${s.done ? 'line-through text-slate-500' : 'text-slate-200'}">${escapeHtml(s.text)}</span>
+          </label>
+          <button onclick="removeStep(${idx})" class="text-slate-500 hover:text-rose-400 p-1 text-xs">✕</button>
+        </div>
+      `).join('');
+    }
+
+    async function toggleStepCheck(index, isDone) {
+      if (!currentDetailProject) return;
+      try {
+        const res = await fetch(`/api/projects/${currentDetailProject.id}/toggle-step`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ step_index: index, done: isDone })
+        });
+        if (res.ok) {
+          currentDetailProject.next_steps[index].done = isDone;
+          renderDetailSteps();
+          loadProjects(); // refresh card
+        }
+      } catch (e) {
+        showToast('Error actualizando paso', 'error');
+      }
+    }
+
+    async function addQuickStep() {
+      const input = document.getElementById('newStepInput');
+      const text = input.value.trim();
+      if (!text || !currentDetailProject) return;
+
+      const updatedSteps = [...(currentDetailProject.next_steps || []), { text: text, done: false }];
+      try {
+        const res = await fetch(`/api/projects/${currentDetailProject.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ next_steps: updatedSteps })
+        });
+        if (res.ok) {
+          currentDetailProject = await res.json();
+          input.value = '';
+          renderDetailSteps();
+          loadProjects();
+          showToast('Paso añadido');
+        }
+      } catch (e) {
+        showToast('Error añadiendo paso', 'error');
+      }
+    }
+
+    async function removeStep(index) {
+      if (!currentDetailProject) return;
+      const updatedSteps = currentDetailProject.next_steps.filter((_, idx) => idx !== index);
+      try {
+        const res = await fetch(`/api/projects/${currentDetailProject.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ next_steps: updatedSteps })
+        });
+        if (res.ok) {
+          currentDetailProject = await res.json();
+          renderDetailSteps();
+          loadProjects();
+        }
+      } catch (e) {
+        showToast('Error eliminando paso', 'error');
+      }
+    }
+
+    // Modal: Formulario Crear / Editar
+    function openCreateModal() {
+      document.getElementById('projectForm').reset();
+      document.getElementById('formProjectId').value = '';
+      document.getElementById('formModalTitle').innerText = 'Nueva Ficha de Proyecto';
+      document.getElementById('formStatus').value = 'idea';
+      document.getElementById('formCategory').value = 'Otro';
+      document.getElementById('formPriority').value = 'media';
+      document.getElementById('formModal').classList.remove('hidden');
+    }
+
+    async function editProjectById(id) {
+      try {
+        const res = await fetch(`/api/projects/${id}`);
+        const p = await res.json();
+        fillForm(p);
+        document.getElementById('formModal').classList.remove('hidden');
+      } catch (e) {
+        showToast('Error cargando datos para edición', 'error');
+      }
+    }
+
+    function openEditModalFromDetail() {
+      if (!currentDetailProject) return;
+      fillForm(currentDetailProject);
+      closeDetailModal();
+      document.getElementById('formModal').classList.remove('hidden');
+    }
+
+    function fillForm(p) {
+      document.getElementById('formProjectId').value = p.id;
+      document.getElementById('formModalTitle').innerText = `Editar: ${p.title}`;
+      document.getElementById('formTitle').value = p.title || '';
+      document.getElementById('formSummary').value = p.summary || '';
+      document.getElementById('formStatus').value = p.status || 'idea';
+      document.getElementById('formCategory').value = p.category || 'Otro';
+      document.getElementById('formPriority').value = p.priority || 'media';
+      document.getElementById('formTags').value = (p.tags || []).join(', ');
+      document.getElementById('formFunctionalScope').value = p.functional_scope || '';
+      document.getElementById('formTechnicalStack').value = p.technical_stack || '';
+      document.getElementById('formLocalPath').value = p.local_path || '';
+      document.getElementById('formRepoUrl').value = p.repo_url || '';
+      document.getElementById('formRunCommand').value = p.run_command || '';
+      document.getElementById('formTechnicalNotes').value = p.technical_notes || '';
+      
+      const steps = (p.next_steps || []).map(s => s.text).join('\n');
+      document.getElementById('formNextSteps').value = steps;
+      document.getElementById('formNotes').value = p.notes || '';
+    }
+
+    function closeFormModal() {
+      document.getElementById('formModal').classList.add('hidden');
+    }
+
+    async function saveProject(e) {
+      e.preventDefault();
+      const id = document.getElementById('formProjectId').value;
+      const title = document.getElementById('formTitle').value.trim();
+      const summary = document.getElementById('formSummary').value.trim();
+      const status = document.getElementById('formStatus').value;
+      const category = document.getElementById('formCategory').value;
+      const priority = document.getElementById('formPriority').value;
+      const tagsStr = document.getElementById('formTags').value;
+      const tags = tagsStr.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
+      const functional_scope = document.getElementById('formFunctionalScope').value.trim();
+      const technical_stack = document.getElementById('formTechnicalStack').value.trim();
+      const local_path = document.getElementById('formLocalPath').value.trim();
+      const repo_url = document.getElementById('formRepoUrl').value.trim();
+      const run_command = document.getElementById('formRunCommand').value.trim();
+      const technical_notes = document.getElementById('formTechnicalNotes').value.trim();
+      
+      const stepsRaw = document.getElementById('formNextSteps').value.split('\n');
+      const next_steps = stepsRaw.filter(s => s.trim().length > 0).map(s => ({ text: s.trim(), done: false }));
+      const notes = document.getElementById('formNotes').value.trim();
+
+      const payload = {
+        title, summary, status, category, priority, tags,
+        functional_scope, technical_stack, local_path, repo_url,
+        run_command, technical_notes, next_steps, notes
+      };
+
+      try {
+        let res;
+        if (id) {
+          res = await fetch(`/api/projects/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          res = await fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        }
+
+        if (res.ok) {
+          closeFormModal();
+          showToast(id ? 'Ficha actualizada' : 'Nueva ficha creada con éxito');
+          loadStats();
+          loadProjects();
+        } else {
+          const err = await res.json();
+          showToast(err.detail || 'Error al guardar', 'error');
+        }
+      } catch (err) {
+        showToast('Error de conexión', 'error');
+      }
+    }
+
+    async function deleteCurrentProject() {
+      if (!currentDetailProject) return;
+      if (!confirm(`¿Seguro que deseas eliminar la ficha de "${currentDetailProject.title}"?`)) return;
+
+      try {
+        const res = await fetch(`/api/projects/${currentDetailProject.id}`, { method: 'DELETE' });
+        if (res.ok) {
+          closeDetailModal();
+          showToast('Proyecto eliminado');
+          loadStats();
+          loadProjects();
+        }
+      } catch (e) {
+        showToast('Error eliminando proyecto', 'error');
+      }
+    }
+
+    async function duplicateCurrentProject() {
+      if (!currentDetailProject) return;
+      try {
+        const res = await fetch(`/api/projects/${currentDetailProject.id}/duplicate`, { method: 'POST' });
+        if (res.ok) {
+          const dup = await res.json();
+          closeDetailModal();
+          showToast('Proyecto duplicado como idea');
+          loadStats();
+          loadProjects();
+          openDetailModal(dup.id);
+        }
+      } catch (e) {
+        showToast('Error duplicando', 'error');
+      }
+    }
+
+    function exportSingleMarkdown() {
+      if (!currentDetailProject) return;
+      const p = currentDetailProject;
+      let md = `# ${p.title}\n\n`;
+      md += `**Estado:** ${p.status.toUpperCase()} | **Categoría:** ${p.category} | **Prioridad:** ${p.priority}\n\n`;
+      if (p.summary) md += `> ${p.summary}\n\n`;
+      
+      md += `## 📋 Alcance Funcional\n\n${p.functional_scope || 'Por definir'}\n\n`;
+      md += `## ⚙️ Detalles Técnicos\n\n`;
+      md += `- **Stack:** ${p.technical_stack || 'Por definir'}\n`;
+      if (p.repo_url) md += `- **Repositorio:** ${p.repo_url}\n`;
+      if (p.local_path) md += `- **Ruta local:** \`${p.local_path}\`\n`;
+      if (p.run_command) md += `- **Comando de arranque:** \`${p.run_command}\`\n`;
+      if (p.technical_notes) md += `\n### Notas Técnicas\n${p.technical_notes}\n`;
+
+      if (p.next_steps && p.next_steps.length > 0) {
+        md += `\n## 🎯 Próximos Pasos\n\n`;
+        p.next_steps.forEach(s => {
+          md += `- [${s.done ? 'x' : ' '}] ${s.text}\n`;
+        });
+      }
+
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ficha_${p.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.md`;
+      a.click();
+      showToast('Markdown descargado');
+    }
+
+    // Modal: Scanner
+    function openScanModal() {
+      document.getElementById('scanModal').classList.remove('hidden');
+      triggerScan();
+    }
+
+    function closeScanModal() {
+      document.getElementById('scanModal').classList.add('hidden');
+    }
+
+    async function triggerScan() {
+      const path = document.getElementById('scanPathInput').value.trim();
+      const loading = document.getElementById('scanLoading');
+      const list = document.getElementById('scanResultsList');
+      const importBtn = document.getElementById('importBtn');
+
+      loading.classList.remove('hidden');
+      list.innerHTML = '';
+      importBtn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/scan?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+        scannedCandidates = data.candidates || [];
+        loading.classList.add('hidden');
+        renderScanResults();
+      } catch (e) {
+        loading.classList.add('hidden');
+        showToast('Error escaneando carpetas', 'error');
+      }
+    }
+
+    function renderScanResults() {
+      const list = document.getElementById('scanResultsList');
+      if (scannedCandidates.length === 0) {
+        list.innerHTML = `<p class="text-xs text-slate-400 py-4 text-center">No se han detectado carpetas con proyectos en esta ruta.</p>`;
+        return;
+      }
+
+      list.innerHTML = scannedCandidates.map((c, idx) => `
+        <div class="p-3.5 rounded-xl border ${c.is_already_saved ? 'border-slate-800 bg-slate-900/40 opacity-70' : 'border-slate-700 bg-slate-900'} flex items-start justify-between gap-3">
+          <div class="flex items-start gap-3">
+            <input type="checkbox" id="scan_chk_${idx}" ${c.is_already_saved ? 'disabled' : 'checked'} onchange="updateScanSelection()" class="mt-1 rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-white text-sm">${escapeHtml(c.title)}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">${escapeHtml(c.category)}</span>
+                ${c.is_already_saved ? '<span class="text-[10px] text-amber-400 font-medium">Ya en catálogo</span>' : ''}
+              </div>
+              <p class="text-xs text-slate-400 mt-0.5 line-clamp-1">${escapeHtml(c.summary)}</p>
+              <div class="text-[11px] text-emerald-400 font-mono mt-1">Stack: ${escapeHtml(c.technical_stack)}</div>
+              <div class="text-[10px] text-slate-500 font-mono mt-0.5">${escapeHtml(c.local_path)}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      updateScanSelection();
+    }
+
+    function updateScanSelection() {
+      const checkedBoxes = scannedCandidates.map((c, idx) => {
+        const el = document.getElementById(`scan_chk_${idx}`);
+        return (el && el.checked && !c.is_already_saved) ? c : null;
+      }).filter(Boolean);
+
+      document.getElementById('scanSelectedCount').innerText = `${checkedBoxes.length} seleccionados para importar`;
+      document.getElementById('importBtn').disabled = checkedBoxes.length === 0;
+    }
+
+    async function importSelectedScanned() {
+      const selected = scannedCandidates.map((c, idx) => {
+        const el = document.getElementById(`scan_chk_${idx}`);
+        return (el && el.checked && !c.is_already_saved) ? c : null;
+      }).filter(Boolean);
+
+      if (selected.length === 0) return;
+
+      try {
+        const res = await fetch('/api/import-scanned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(selected)
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          showToast(`¡${resData.imported_count} proyectos importados con éxito!`);
+          closeScanModal();
+          loadStats();
+          loadProjects();
+        }
+      } catch (e) {
+        showToast('Error importando proyectos', 'error');
+      }
+    }
+
+    // Backup & Restore
+    function exportBackup() {
+      window.location.href = '/api/export';
+      showToast('Descargando copia de seguridad JSON...');
+    }
+
+    async function importBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const json = JSON.parse(e.target.result);
+          const res = await fetch('/api/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(json)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            showToast(`Restaurados ${data.imported_count} proyectos`);
+            loadStats();
+            loadProjects();
+          } else {
+            showToast('Error al importar el archivo', 'error');
+          }
+        } catch (err) {
+          showToast('Archivo JSON no válido', 'error');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    // Helpers
+    function copyToClipboard(text, btnElement) {
+      navigator.clipboard.writeText(text).then(() => {
+        if (btnElement) {
+          const original = btnElement.innerText;
+          btnElement.innerText = '¡Copiado!';
+          setTimeout(() => btnElement.innerText = original, 2000);
+        } else {
+          showToast('Copiado al portapapeles');
+        }
+      }).catch(() => {
+        showToast('No se pudo copiar', 'error');
+      });
+    }
+
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      if (type === 'error') {
+        toast.className = 'fixed bottom-5 right-5 z-50 transform translate-y-0 opacity-100 transition duration-300 pointer-events-none px-4 py-2.5 rounded-xl shadow-xl border text-xs sm:text-sm font-medium flex items-center gap-2 bg-rose-950/90 text-rose-200 border-rose-800';
+      } else {
+        toast.className = 'fixed bottom-5 right-5 z-50 transform translate-y-0 opacity-100 transition duration-300 pointer-events-none px-4 py-2.5 rounded-xl shadow-xl border text-xs sm:text-sm font-medium flex items-center gap-2 bg-slate-900/90 text-slate-100 border-indigo-500/40 shadow-indigo-500/10';
+      }
+      setTimeout(() => {
+        toast.classList.replace('translate-y-0', 'translate-y-16');
+        toast.classList.replace('opacity-100', 'opacity-0');
+      }, 3000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
