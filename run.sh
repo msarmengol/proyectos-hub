@@ -11,4 +11,4 @@ echo "=========================================================="
 echo "⚡ Iniciando ProjectHub en http://localhost:$PORT"
 echo "=========================================================="
 
-"$DIR/venv/bin/uvicorn" app.main:app --host "$HOST" --port "$PORT"
+"$DIR/venv/bin/uvicorn" app.main:app --host "$HOST" --port "$PORT" --reload

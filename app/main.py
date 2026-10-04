@@ -18,7 +18,7 @@ from .database import (
     duplicate_project,
     get_stats
 )
-from .scanner import scan_directory_for_projects
+from .scanner import scan_directory_for_projects, sync_project_from_disk
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -138,6 +138,13 @@ def api_duplicate_project(project_id: int):
     if not duplicated:
         raise HTTPException(status_code=404, detail="No se pudo duplicar")
     return duplicated
+
+@app.post("/api/projects/{project_id}/sync-disk")
+def api_sync_project(project_id: int):
+    updated, changes = sync_project_from_disk(project_id)
+    if updated is None:
+        raise HTTPException(status_code=400, detail=changes)
+    return {"project": updated, "changes": changes}
 
 @app.post("/api/projects/{project_id}/toggle-step")
 def api_toggle_step(project_id: int, req: ToggleStepRequest):

@@ -2,7 +2,7 @@ import os
 import re
 import json
 from pathlib import Path
-from .database import get_all_projects
+from .database import get_all_projects, get_project_by_id, update_project
 
 IGNORE_DIRS = {
     ".git", ".cache", ".config", ".local", ".npm", ".vscode-server",
@@ -208,19 +208,30 @@ def detect_project_details(dir_path: Path):
     }
 
 def scan_directory_for_projects(base_path: str = "/home/ubuntu"):
-    root = Path(base_path)
-    if not root.is_dir():
+    root = Path(base_path).resolve()
+    if not root.exists() or not root.is_dir():
         return []
         
     existing_projects = get_all_projects()
     saved_paths = {p.get("local_path", "").rstrip("/") for p in existing_projects if p.get("local_path")}
     
+    # Check if root itself is a project (and not a system home directory)
+    has_git = (root / ".git").is_dir()
+    has_py = any(root.glob("*.py"))
+    has_pkg = (root / "package.json").exists()
+    has_docker = (root / "docker-compose.yml").exists() or (root / "Dockerfile").exists()
+    has_readme = (root / "README.md").exists()
+    
+    if (has_git or has_py or has_pkg or has_docker or has_readme) and root.name not in ["ubuntu", "home", "root"]:
+        detected = detect_project_details(root)
+        detected["is_already_saved"] = str(root).rstrip("/") in saved_paths
+        return [detected]
+        
     candidates = []
     try:
         for entry in os.scandir(root):
             if entry.is_dir() and not entry.name.startswith(".") and entry.name not in IGNORE_DIRS:
                 dir_path = Path(entry.path)
-                # Check if it has any indicator of a project
                 has_git = (dir_path / ".git").is_dir()
                 has_py = any(dir_path.glob("*.py"))
                 has_pkg = (dir_path / "package.json").exists()
@@ -235,3 +246,51 @@ def scan_directory_for_projects(base_path: str = "/home/ubuntu"):
         print(f"Error scanning {base_path}: {e}")
         
     return candidates
+
+def sync_project_from_disk(project_id: int):
+    project = get_project_by_id(project_id)
+    if not project:
+        return None, "Proyecto no encontrado"
+        
+    local_path = project.get("local_path")
+    if not local_path:
+        return None, "El proyecto no tiene una ruta local en disco configurada"
+        
+    p_path = Path(local_path)
+    if not p_path.exists() or not p_path.is_dir():
+        return None, f"La carpeta local no existe en disco: {local_path}"
+        
+    detected = detect_project_details(p_path)
+    
+    updates = {}
+    changes = []
+    
+    # Check repo URL
+    if detected.get("repo_url") and detected["repo_url"] != project.get("repo_url"):
+        updates["repo_url"] = detected["repo_url"]
+        changes.append("Repositorio Git actualizado")
+        
+    # Check technical stack
+    if detected.get("technical_stack") and detected["technical_stack"] != "Por definir":
+        if detected["technical_stack"] != project.get("technical_stack"):
+            updates["technical_stack"] = detected["technical_stack"]
+            changes.append("Stack tecnológico actualizado")
+            
+    # Check run command if empty
+    if detected.get("run_command") and not project.get("run_command"):
+        updates["run_command"] = detected["run_command"]
+        changes.append("Comando de arranque actualizado")
+        
+    # Check tags (merge new tags)
+    current_tags = set(project.get("tags") or [])
+    new_tags = set(detected.get("tags") or [])
+    merged_tags = list(current_tags.union(new_tags))
+    if set(merged_tags) != current_tags:
+        updates["tags"] = merged_tags
+        changes.append("Nuevas etiquetas añadidas")
+        
+    if updates:
+        updated_project = update_project(project_id, updates)
+        return updated_project, changes
+    else:
+        return project, ["Los datos técnicos ya estaban al día"]

@@ -301,6 +301,10 @@
           </button>
         </div>
         <div class="flex gap-2">
+          <button id="detailSyncBtn" onclick="syncCurrentProjectFromDisk()" class="hidden px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition flex items-center gap-1.5 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span>🔄 Sincronizar con disco</span>
+          </button>
           <button onclick="closeDetailModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
             Cerrar
           </button>
@@ -678,6 +682,11 @@
 
               <!-- Quick actions -->
               <div class="flex items-center gap-1">
+                ${p.local_path ? `
+                  <button onclick="syncProjectById(${p.id}, event)" class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition" title="Sincronizar con disco">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  </button>
+                ` : ''}
                 <button onclick="openDetailModal(${p.id})" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition">
                   Ver Ficha
                 </button>
@@ -794,13 +803,16 @@
         repoContainer.innerHTML = `<span class="text-slate-500">Sin repositorio configurado</span>`;
       }
 
-      // Local Path
+      // Local Path & Sync button
       const pathRow = document.getElementById('detailPathRow');
+      const syncBtn = document.getElementById('detailSyncBtn');
       if (p.local_path) {
         pathRow.classList.remove('hidden');
         document.getElementById('detailPath').innerText = p.local_path;
+        if (syncBtn) syncBtn.classList.remove('hidden');
       } else {
         pathRow.classList.add('hidden');
+        if (syncBtn) syncBtn.classList.add('hidden');
       }
 
       // Run Command
@@ -1097,6 +1109,53 @@
       a.download = `ficha_${p.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.md`;
       a.click();
       showToast('Markdown descargado');
+    }
+
+    // Sync from disk
+    async function syncCurrentProjectFromDisk() {
+      if (!currentDetailProject) return;
+      const btn = document.getElementById('detailSyncBtn');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = `<span class="animate-spin inline-block mr-1">⏳</span> Sincronizando...`;
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/projects/${currentDetailProject.id}/sync-disk`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          currentDetailProject = data.project;
+          renderDetailModal();
+          loadProjects();
+          showToast(data.changes.join(' • '));
+        } else {
+          showToast(data.detail || 'Error al sincronizar', 'error');
+        }
+      } catch (err) {
+        showToast('Error de conexión', 'error');
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    async function syncProjectById(id, event) {
+      if (event) event.stopPropagation();
+      try {
+        const res = await fetch(`/api/projects/${id}/sync-disk`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          loadProjects();
+          if (currentDetailProject && currentDetailProject.id === id) {
+            currentDetailProject = data.project;
+            renderDetailModal();
+          }
+          showToast(`Sincronizado: ${data.changes.join(' • ')}`);
+        } else {
+          showToast(data.detail || 'Error al sincronizar', 'error');
+        }
+      } catch (err) {
+        showToast('Error de conexión', 'error');
+      }
     }
 
     // Modal: Scanner
